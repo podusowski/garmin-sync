@@ -1,2 +1,2 @@
-# garmin-sync
-syncnhronize EPO on garmin watch
+## How to download an EPO
+https://www.kluenter.de/garmin-ephemeris-files-and-linux/
