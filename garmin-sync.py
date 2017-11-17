@@ -27,7 +27,8 @@ def locate_epo_on_device(device_path):
 
 
 def find_activities(device_path):
-    return os.listdir(os.path.join(device_path, "Garmin/Activity"))
+    root = os.path.join(device_path, "Garmin", "Activity")
+    return [os.path.join(root, activity) for activity in os.listdir(root)]
 
 
 def fix_epo(data):
@@ -67,6 +68,7 @@ def download_epo(out='EPO.BIN'):
 
 class GarminConnect:
     URL_LOGIN = 'https://sso.garmin.com/sso/login?service=https%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&webhost=olaxpw-connect04&source=https%3A%2F%2Fconnect.garmin.com%2Fen-US%2Fsignin&redirectAfterAccountLoginUrl=https%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&redirectAfterAccountCreationUrl=https%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&gauthHost=https%3A%2F%2Fsso.garmin.com%2Fsso&locale=en_US&id=gauth-widget&cssUrl=https%3A%2F%2Fstatic.garmincdn.com%2Fcom.garmin.connect%2Fui%2Fcss%2Fgauth-custom-v1.1-min.css&clientId=GarminConnect&rememberMeShown=true&rememberMeChecked=false&createAccountShown=true&openCreateAccount=false&usernameShown=false&displayNameShown=false&consumeServiceTicket=false&initialFocus=true&embedWidget=false&generateExtraServiceTicket=false'
+    URL_UPLOAD = 'https://connect.garmin.com/modern/proxy/upload-service/upload/.fit'
 
     def __init__(self, username, password):
         self._session = requests.Session()
@@ -78,10 +80,20 @@ class GarminConnect:
 
         r = self._session.post(GarminConnect.URL_LOGIN, post_data)
 
-        print(r.content)
-
         if "CASTGC" not in self._session.cookies:
             raise RuntimeError("login error")
+
+    def upload_activity(self, f):
+        files = {"file": f}
+        r = self._session.post(GarminConnect.URL_UPLOAD, files=files)
+        print(r.content)
+
+    """
+    Upload:
+    POST https://connect.garmin.com/modern/proxy/upload-service/upload/.fit
+    content type: multipart/form-data; boundary=--------------
+    """
+
 
 
 def connect_to_gc():
@@ -111,10 +123,15 @@ def main():
     epo_path = locate_epo_on_device(device_path)
     download_epo(epo_path)
 
-    logging.info("Activities: %s", find_activities(device_path))
+    logging.info("Connecting to GC")
 
     gc = connect_to_gc()
 
+    logging.info("Activities: %s", find_activities(device_path))
+
+    for activity in find_activities(device_path):
+        with open(activity, "rb") as f:
+            gc.upload_activity(f)
 
 if __name__ == "__main__":
     main()
