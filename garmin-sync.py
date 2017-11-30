@@ -97,13 +97,10 @@ class GarminConnect:
         print(r.content)
 
     def upload_activity(self, f):
-        files = {"file": ('activity.fit', f, "multipart/form-data")}
+        files = {"file": ('activity.fit', f, "application/octet-stream")}
         data = {"NK": "NT"}
-        r = self._session.post(GarminConnect.URL_UPLOAD, files=files, data=data)
-        print(r.request.headers)
-        print(r)
+        r = self._session.post(GarminConnect.URL_UPLOAD, files=files, headers=data)
         print(r.content)
-        print("-----" * 20)
 
     """
     Upload:
@@ -144,7 +141,7 @@ def main():
 
     gc = connect_to_gc()
 
-    logging.info("Activities: %s", find_activities(device_path))
+    logging.info("Uploading activities: %s", find_activities(device_path))
 
     for activity in find_activities(device_path):
         with open(activity, "rb") as f:
