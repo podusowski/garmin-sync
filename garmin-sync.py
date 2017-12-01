@@ -14,7 +14,7 @@ def find_garmin_device():
         logging.info('got garmin device at {}'.format(path))
         return path
 
-    logging.error('garmin device is not mounted or I do not know how to find it')
+    raise RuntimeError("no Garmin device found")
 
 
 def locate_epo_on_device(device_path):
@@ -23,7 +23,7 @@ def locate_epo_on_device(device_path):
     if os.path.exists(possible_path):
         return possible_path
 
-    logging.error('can not find EPO on the device')
+    raise RuntimeError("can not find EPO on the device")
 
 
 def find_activities(device_path):
@@ -91,23 +91,11 @@ class GarminConnect:
         if r.status_code != 200:
             raise RuntimeError("Something bad happened: {}".format(r.content))
 
-
-        r = self._session.get("https://connect.garmin.com/modern/import-data")
-
-        print(r.content)
-
     def upload_activity(self, f):
         files = {"file": ('activity.fit', f, "application/octet-stream")}
         data = {"NK": "NT"}
         r = self._session.post(GarminConnect.URL_UPLOAD, files=files, headers=data)
         print(r.content)
-
-    """
-    Upload:
-    POST https://connect.garmin.com/modern/proxy/upload-service/upload/.fit
-    content type: multipart/form-data; boundary=--------------
-    """
-
 
 
 def connect_to_gc():
@@ -127,12 +115,9 @@ def connect_to_gc():
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("requests").setLevel(logging.WARN)
 
     device_path = find_garmin_device()
-
-    if not device_path:
-        logging.error("no device")
-        return
 
     epo_path = locate_epo_on_device(device_path)
     download_epo(epo_path)
@@ -146,6 +131,7 @@ def main():
     for activity in find_activities(device_path):
         with open(activity, "rb") as f:
             gc.upload_activity(f)
+
 
 if __name__ == "__main__":
     main()
