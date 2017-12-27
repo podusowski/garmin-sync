@@ -7,28 +7,36 @@ import os
 from passlocker import Secrets
 
 
-def find_garmin_device():
-    path = os.path.join('/media', os.environ.get('USER'), 'GARMIN')
+class Device:
+    def __init__(self):
+        self._path = self._find_garmin_device()
 
-    if os.path.exists(path):
-        logging.info('got garmin device at {}'.format(path))
-        return path
+    @property
+    def path(self):
+        return self._path
 
-    raise RuntimeError("no Garmin device found")
+    def _find_garmin_device(self):
+        path = os.path.join('/media', os.environ.get('USER'), 'GARMIN')
 
+        if os.path.exists(path):
+            logging.debug('Found garmin device at {}'.format(path))
+            return path
 
-def locate_epo_on_device(device_path):
-    possible_path = os.path.join(device_path, 'Garmin/GPS/EPO.BIN')
+        raise RuntimeError("no Garmin device found")
 
-    if os.path.exists(possible_path):
-        return possible_path
+    @property
+    def epo_path(self):
+        possible_path = os.path.join(self.path, 'Garmin/GPS/EPO.BIN')
 
-    raise RuntimeError("can not find EPO on the device")
+        if os.path.exists(possible_path):
+            return possible_path
 
+        raise RuntimeError("can not find EPO on the device")
 
-def find_activities(device_path):
-    root = os.path.join(device_path, "Garmin", "Activity")
-    return [os.path.join(root, activity) for activity in os.listdir(root)]
+    @property
+    def activities(self):
+        root = os.path.join(self.path, "Garmin", "Activity")
+        return [os.path.join(root, activity) for activity in os.listdir(root)]
 
 
 def fix_epo(data):
@@ -48,7 +56,7 @@ def fix_epo(data):
 
 def download_epo(out='EPO.BIN'):
     # curl -H "Garmin-Client-Name: CoreService" -H "Content-Type: application/octet-stream" --data-binary @garmin-postdata http://omt.garmin.com/Rce/ProtobufApi/EphemerisService/GetEphemerisData
-    logging.info('getting EPO')
+    logging.debug('Getting EPO')
 
     url = 'http://omt.garmin.com/Rce/ProtobufApi/EphemerisService/GetEphemerisData'
     headers = {'Garmin-Client-Name': 'CoreService', 'Content-Type': 'application/octet-stream'}
@@ -63,7 +71,7 @@ def download_epo(out='EPO.BIN'):
     with open(out, 'wb') as f:
         f.write(data)
 
-    logging.info('EPO written to {}'.format(out))
+    logging.debug('EPO written to {}'.format(out))
 
 
 class GarminConnect:
@@ -91,11 +99,18 @@ class GarminConnect:
         if r.status_code != 200:
             raise RuntimeError("Something bad happened: {}".format(r.content))
 
-    def upload_activity(self, f):
-        files = {"file": ('activity.fit', f, "application/octet-stream")}
-        data = {"NK": "NT"}
-        r = self._session.post(GarminConnect.URL_UPLOAD, files=files, headers=data)
-        print(r.content)
+    def upload_activity(self, activity):
+        with open(activity, "rb") as f:
+            files = {"file": ('activity.fit', f, "application/octet-stream")}
+            data = {"NK": "NT"}
+            r = self._session.post(GarminConnect.URL_UPLOAD, files=files, headers=data)
+
+        def extract_messages(result):
+            report = r.json()['detailedImportResult']
+            return [message['content'] for item in report['successes'] + report['failures']
+                                    for message in item['messages']]
+
+        logging.info("%s: %s", os.path.basename(activity), ', '.join(extract_messages(r)))
 
 
 def connect_to_gc():
@@ -114,23 +129,20 @@ def connect_to_gc():
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.getLogger("requests").setLevel(logging.WARN)
 
-    device_path = find_garmin_device()
+    device = Device()
 
-    epo_path = locate_epo_on_device(device_path)
-    download_epo(epo_path)
+    logging.info("Updating EPO")
+    download_epo(device.epo_path)
 
-    logging.info("Connecting to GC")
+    logging.info("Uploading %d activities", len(device.activities))
 
     gc = connect_to_gc()
 
-    logging.info("Uploading activities: %s", find_activities(device_path))
-
-    for activity in find_activities(device_path):
-        with open(activity, "rb") as f:
-            gc.upload_activity(f)
+    for activity in device.activities:
+        gc.upload_activity(activity)
 
 
 if __name__ == "__main__":
