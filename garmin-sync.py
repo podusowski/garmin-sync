@@ -107,8 +107,11 @@ class GarminConnect:
 
         def extract_messages(result):
             report = r.json()['detailedImportResult']
-            return [message['content'] for item in report['successes'] + report['failures']
-                                    for message in item['messages']]
+
+            for item in report['successes'] + report['failures']:
+                if 'messages' in item and item['messages'] is not None:
+                    for message in item['messages']:
+                        yield message['content']
 
         logging.info("%s: %s", os.path.basename(activity), ', '.join(extract_messages(r)))
 
