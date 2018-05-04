@@ -76,7 +76,7 @@ def download_epo(out='EPO.BIN'):
 
 class GarminConnect:
     URL_LOGIN = 'https://sso.garmin.com/sso/login?service=https%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&webhost=olaxpw-connect04&source=https%3A%2F%2Fconnect.garmin.com%2Fen-US%2Fsignin&redirectAfterAccountLoginUrl=https%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&redirectAfterAccountCreationUrl=https%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&gauthHost=https%3A%2F%2Fsso.garmin.com%2Fsso&locale=en_US&id=gauth-widget&cssUrl=https%3A%2F%2Fstatic.garmincdn.com%2Fcom.garmin.connect%2Fui%2Fcss%2Fgauth-custom-v1.1-min.css&clientId=GarminConnect&rememberMeShown=true&rememberMeChecked=false&createAccountShown=true&openCreateAccount=false&usernameShown=false&displayNameShown=false&consumeServiceTicket=false&initialFocus=true&embedWidget=false&generateExtraServiceTicket=false'
-    URL_POST_AUTH = 'https://connect.garmin.com/post-auth/login?'
+    URL_MAIN_PAGE = 'https://connect.garmin.com/modern/'
     URL_UPLOAD = 'https://connect.garmin.com/modern/proxy/upload-service/upload/.fit'
 
     def __init__(self, username, password):
@@ -92,9 +92,9 @@ class GarminConnect:
         if "CASTGC" not in self._session.cookies:
             raise RuntimeError("login error")
 
-        # not sure what is it for, but gcexport does that
+        # need to request this one to get proper session cookies
         login_ticket = self._session.cookies["CASTGC"]
-        r = self._session.get(GarminConnect.URL_POST_AUTH, params={"ticket": login_ticket})
+        r = self._session.get(GarminConnect.URL_MAIN_PAGE, params={"ticket": login_ticket})
 
         if r.status_code != 200:
             raise RuntimeError("Something bad happened: {}".format(r.content))
